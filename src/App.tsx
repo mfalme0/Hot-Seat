@@ -6,6 +6,7 @@ import {
   ThemePreference,
 } from './components/GraffitiWallStage';
 import { BackwallControlPage, UserAccount } from './components/BackwallControlPage';
+import { OnboardingModal } from './components/OnboardingModal';
 import {
   auth,
   onAuthStateChanged,
@@ -14,12 +15,21 @@ import {
 } from './firebase';
 
 const ACCOUNT_STORAGE_KEY = 'hotseat_user_account_v1';
+const ONBOARD_STORAGE_KEY = 'hotseat_onboarded_v1';
 
 export function App() {
   const [snapshot, setSnapshot] = useState<ArenaSnapshot | null>(null);
   const [activePage, setActivePage] = useState<PageRoute>('wall');
   const [selectedManualAgentId, setSelectedManualAgentId] = useState<string>('');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(false);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(ONBOARD_STORAGE_KEY) !== '1';
+    } catch {
+      return false;
+    }
+  });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const prevTakeoverCountRef = useRef<number | null>(null);
 
@@ -170,6 +180,10 @@ export function App() {
     setTimeout(() => {
       setToastMessage((curr) => (curr === msg ? null : curr));
     }, 3600);
+  };
+
+  const handleOpenOnboarding = () => {
+    setShowOnboarding(true);
   };
 
   useEffect(() => {
@@ -425,6 +439,11 @@ export function App() {
         </div>
       )}
 
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+      />
+
       <GraffitiWallStage
         snapshot={snapshot}
         isDarkMode={isDarkMode}
@@ -446,6 +465,7 @@ export function App() {
         soundEnabled={soundEnabled}
         onToggleSound={() => setSoundEnabled(!soundEnabled)}
         isEmbedMode={isEmbedMode}
+        onShowOnboarding={handleOpenOnboarding}
       />
 
       {activePage !== 'wall' && !isEmbedMode && (

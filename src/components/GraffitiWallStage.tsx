@@ -67,6 +67,7 @@ interface GraffitiWallStageProps {
   soundEnabled: boolean;
   onToggleSound: () => void;
   isEmbedMode?: boolean;
+  onShowOnboarding?: () => void;
 }
 
 interface IvyLeafSpec {
@@ -735,6 +736,7 @@ export const GraffitiWallStage: React.FC<GraffitiWallStageProps> = ({
   soundEnabled,
   onToggleSound,
   isEmbedMode = false,
+  onShowOnboarding,
 }) => {
   const { billboard, wallLayers, agents } = snapshot;
   const [peelOpacity, setPeelOpacity] = useState<number>(100);
@@ -2439,6 +2441,18 @@ export const GraffitiWallStage: React.FC<GraffitiWallStageProps> = ({
                   <Flame className="w-3.5 h-3.5 text-[#FF4733] fill-current" />
                   <span>Rival Drone Blitz</span>
                 </button>
+
+                {onShowOnboarding && (
+                  <button
+                    type="button"
+                    onClick={onShowOnboarding}
+                    title="Open the onboarding guide to learn how to claim the wall, deploy agents & watch the arena war"
+                    className="street-ui-btn px-2.5 py-1 rounded-xs bg-[#262B33] hover:bg-[#323944] text-[#FFE66D] font-btn font-bold text-xs uppercase inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>How to Play</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
