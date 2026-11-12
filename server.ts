@@ -9,7 +9,7 @@ import crypto from 'crypto';
 dotenv.config();
 process.env.DISABLE_HMR = 'true';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const BASE_RATE_CENTS_PER_MIN = 4.0; // 20 cents for 5 minutes
 const MAX_RATE_CENTS_PER_MIN = 40.0; // 10x base cap ($2.00 for 5 minutes)
 const BLOCK_DURATION_MINUTES = 5;

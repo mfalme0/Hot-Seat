@@ -140,7 +140,7 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validate connection to Firestore on boot
+// Validate connection to Firestore on boot (non-blocking; failures are logged but never throw)
 async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
@@ -150,7 +150,9 @@ async function testConnection() {
     }
   }
 }
-testConnection();
+
+// Fire-and-forget connection check; must not block module import or app render
+void testConnection();
 
 export const ADMIN_EMAIL = 'imtyroon@gmail.com';
 

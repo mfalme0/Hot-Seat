@@ -31,6 +31,8 @@ export function App() {
     }
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const prevTakeoverCountRef = useRef<number | null>(null);
 
   // System Light/Dark Mode & Time-of-Day Sync
@@ -85,7 +87,12 @@ export function App() {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         try {
-          const synced = await syncFirebaseUserToFirestore(fbUser);
+          const synced = await Promise.race([
+            syncFirebaseUserToFirestore(fbUser),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Firebase sync timed out')), 8000)
+            ),
+          ]);
           const account: UserAccount = {
             id: synced.uid,
             name: synced.name,
@@ -188,14 +195,30 @@ export function App() {
 
   useEffect(() => {
     let es: EventSource | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let mounted = true;
 
-    fetch('/api/arena/snapshot')
-      .then((r) => r.json())
-      .then((data: ArenaSnapshot) => {
-        setSnapshot(data);
-        prevTakeoverCountRef.current = data.billboard.totalTakeoversCount;
-      })
-      .catch(() => {});
+    const loadSnapshot = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+        const res = await fetch('/api/arena/snapshot');
+        if (!res.ok) throw new Error(`Snapshot fetch failed: ${res.status}`);
+        const data: ArenaSnapshot = await res.json();
+        if (mounted) {
+          setSnapshot(data);
+          prevTakeoverCountRef.current = data.billboard.totalTakeoversCount;
+          setIsLoading(false);
+        }
+      } catch (err: any) {
+        if (mounted) {
+          setLoadError(err.message || 'Failed to load the billboard wall.');
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadSnapshot();
 
     es = new EventSource('/api/arena/stream');
     es.onmessage = (event) => {
@@ -208,14 +231,24 @@ export function App() {
           playSpraySound();
         }
         prevTakeoverCountRef.current = data.billboard.totalTakeoversCount;
-        setSnapshot(data);
+        if (mounted) setSnapshot(data);
       } catch {
         // Ignore parse error
       }
     };
+    es.onerror = () => {
+      // SSE may not be available on all hosts; fall back to polling
+      es?.close();
+      es = null;
+      if (mounted && !pollTimer) {
+        pollTimer = setInterval(loadSnapshot, 4000);
+      }
+    };
 
     return () => {
+      mounted = false;
       es?.close();
+      if (pollTimer) clearInterval(pollTimer);
     };
   }, [soundEnabled]);
 
@@ -412,6 +445,43 @@ export function App() {
   };
 
   if (!snapshot) {
+    if (loadError) {
+      return (
+        <div className="min-h-screen bg-slate-100 dark:bg-[#0D1118] text-slate-900 dark:text-slate-100 flex items-center justify-center p-6">
+          <div className="wall-white-brick-btn px-8 py-6 text-center space-y-3">
+            <div className="font-btn font-extrabold text-3xl tracking-tight">
+              HOT SEAT
+            </div>
+            <p className="text-xs font-ui font-semibold">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setLoadError(null);
+                setIsLoading(true);
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                (() => {
+                  fetch('/api/arena/snapshot')
+                    .then((r) => r.json())
+                    .then((data: ArenaSnapshot) => {
+                      setSnapshot(data);
+                      prevTakeoverCountRef.current = data.billboard.totalTakeoversCount;
+                      setIsLoading(false);
+                    })
+                    .catch((err: any) => {
+                      setLoadError(err.message || 'Failed to load the billboard wall.');
+                      setIsLoading(false);
+                    });
+                })();
+              }}
+              className="wall-white-brick-btn px-6 py-2 text-xs font-ui font-bold uppercase tracking-wider hover:opacity-80 transition-opacity"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-100 dark:bg-[#0D1118] text-slate-900 dark:text-slate-100 flex items-center justify-center p-6">
         <div className="wall-white-brick-btn px-8 py-6 text-center space-y-1">
